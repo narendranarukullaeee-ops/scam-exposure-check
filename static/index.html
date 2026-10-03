@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exposure Check: what can scammers find about you?</title>
+<style>
+:root{--bg:#eef2f5;--ink:#112230;--muted:#566774;--line:#cbd5dd;--accent:#1e4fd6;--low:#2f7d5b;--med:#c98a12;--high:#d4682a;--crit:#b3261e;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:640px;margin:0 auto;padding:40px 20px 72px}
+h1{font:600 clamp(30px,6vw,44px)/1.1 "Iowan Old Style","Palatino Linotype",Georgia,serif;margin:0 0 14px;letter-spacing:-.01em}
+h2{font:600 22px/1.2 "Iowan Old Style","Palatino Linotype",Georgia,serif;margin:36px 0 10px}
+p{margin:0 0 12px;max-width:62ch}.muted{color:var(--muted);font-size:14px}
+label{display:block;font-weight:600;margin:20px 0 6px}
+input{width:100%;font:inherit;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;margin-top:14px;padding:12px 20px;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
+button.link{background:none;color:var(--accent);padding:0;margin:0 0 0 8px;text-decoration:underline}
+button:disabled{opacity:.6;cursor:wait}
+.banner{background:#fff4d6;border:1px solid #e3c36a;padding:10px 14px;border-radius:6px;margin-bottom:22px;font-size:14px}
+.err{color:var(--crit);font-weight:600;margin-top:12px;min-height:1.4em}
+.gauge{position:relative;height:12px;border-radius:6px;margin:22px 0 8px;background:linear-gradient(90deg,var(--low) 0 25%,var(--med) 25% 50%,var(--high) 50% 75%,var(--crit) 75% 100%)}
+.gauge i{position:absolute;top:-6px;width:4px;height:24px;background:var(--ink);border-radius:2px;transform:translateX(-2px)}
+.gauge,.gauge i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.scale{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.big{font:600 56px/1 "Iowan Old Style",Georgia,serif}
+ul{padding-left:20px;margin:0 0 12px}li{margin:6px 0}
+.item{border-top:1px solid var(--line);padding:12px 0}.item b{display:block}
+.tag{font-size:13px;font-weight:600}
+.LOW{color:var(--low)}.MEDIUM{color:var(--med)}.HIGH{color:var(--high)}.CRITICAL{color:var(--crit)}
+footer{margin-top:44px;border-top:1px solid var(--line);padding-top:16px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<div id="banner" class="banner" hidden><b>Demo mode.</b> Results below are simulated and do not reflect your real exposure.</div>
+<h1>What can scammers already find about you?</h1>
+<p>Confirm your email with a one-time code and we'll check that address against known data breaches, then show how scammers could use what leaked. Nothing is stored.</p>
+
+<section id="s1">
+  <label for="email">Your email address</label>
+  <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+  <button id="send">Send my code</button>
+</section>
+
+<section id="s2" hidden>
+  <label for="code">6-digit code sent to <span id="to"></span></label>
+  <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+  <button id="check">Check my exposure</button>
+  <button class="link" id="back" type="button">Use a different email</button>
+</section>
+<div class="err" id="err" role="alert"></div>
+
+<section id="res" hidden>
+  <div class="big"><span id="score"></span><span class="muted"> / 100</span></div>
+  <div class="tag" id="level"></div>
+  <div class="gauge"><i id="mark"></i></div>
+  <div class="scale"><span>Low</span><span>Medium</span><span>High</span><span>Critical</span></div>
+  <p id="summary" style="margin-top:18px"></p>
+  <h2>What was exposed</h2><div id="exp"></div>
+  <h2>How a scammer could use it</h2><div id="scn"></div>
+  <h2>What to do next</h2><ul id="act"></ul>
+  <h2>Protect your phone number</h2><ul id="phone"></ul>
+  <p class="muted" id="note"></p>
+</section>
+
+<footer class="muted">
+  <p>We look up only the address you verify. Emails, codes and results are not saved, and codes expire after 10 minutes. This is a personal prototype and is not affiliated with any employer or financial institution. Views are my own and not related to my employer.</p>
+</footer>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+async function api(path, body) {
+  const r = await fetch(path, {method: body ? 'POST' : 'GET', headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'Check the details and try again.');
+  return d;
+}
+const busy = (b, on) => { b.disabled = on; };
+const fail = m => { $('#err').textContent = m || ''; };
+let email = '';
+
+api('/v1/config').then(c => { $('#banner').hidden = c.data_source !== 'simulated'; }).catch(() => {});
+
+$('#send').onclick = async e => {
+  fail(); email = $('#email').value.trim(); busy(e.target, true);
+  try { await api('/v1/otp/request', {email}); $('#to').textContent = email; $('#s1').hidden = true; $('#s2').hidden = false; $('#code').focus(); }
+  catch (x) { fail(x.message); } finally { busy(e.target, false); }
+};
+$('#back').onclick = () => { fail(); $('#s2').hidden = true; $('#s1').hidden = false; };
+$('#check').onclick = async e => {
+  fail(); busy(e.target, true);
+  try { show(await api('/v1/check', {email, code: $('#code').value.trim()})); }
+  catch (x) { fail(x.message); } finally { busy(e.target, false); }
+};
+
+function show(d) {
+  $('#s2').hidden = true; $('#res').hidden = false;
+  $('#score').textContent = d.score; $('#mark').style.left = Math.min(d.score, 99) + '%';
+  const lv = $('#level'); lv.textContent = d.level.charAt(0) + d.level.slice(1).toLowerCase() + ' exposure'; lv.className = 'tag ' + d.level;
+  $('#summary').textContent = d.summary;
+  const exp = $('#exp'); exp.replaceChildren();
+  if (!d.exposures.length) exp.append(mk('p', '', 'No exposed personal data types were found for this address.'));
+  d.exposures.forEach(x => { const i = mk('div', 'item'); i.append(mk('b', '', x.data_type)); i.append(mk('span', 'muted', 'Exposed in: ' + x.breaches.join(', '))); exp.append(i); });
+  const scn = $('#scn'); scn.replaceChildren();
+  if (!d.scenarios.length) scn.append(mk('p', '', 'No specific scam scenarios stand out from this data.'));
+  d.scenarios.forEach(x => { const i = mk('div', 'item'); const b = mk('b', '', x.title + ' '); b.append(mk('span', 'tag ' + (x.likelihood === 'HIGH' ? 'HIGH' : x.likelihood === 'MEDIUM' ? 'MEDIUM' : 'LOW'), '(' + x.likelihood.toLowerCase() + ' likelihood)')); i.append(b, mk('span', '', x.description)); scn.append(i); });
+  const fill = (id, list) => { const ul = $(id); ul.replaceChildren(); list.forEach(t => ul.append(mk('li', '', t))); };
+  fill('#act', d.actions.length ? d.actions : ['Keep two-factor authentication on for email and banking.']); fill('#phone', d.phone_guidance);
+  $('#note').textContent = d.disclaimer + ' ' + d.attribution;
+  $('#res').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+}
+</script>
+</body>
+</html>
