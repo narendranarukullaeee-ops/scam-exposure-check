@@ -6,6 +6,8 @@ A consent-based tool that turns breach data into scam-prevention guidance for th
 
 **Status:** working prototype. As published, it runs on **simulated breach data**, so results are illustrative and are not anyone's real exposure. Real lookups need a breach-data API key (see Configuration).
 
+**Try it without installing anything:** [demo with three made-up people](https://narendranarukullaeee-ops.github.io/scam-exposure-check/). It uses simulated breach records and needs no sign-up.
+
 **Disclaimer:** personal project. Views are my own and not related to my employer.
 
 ![Exposure Check results page, shown with simulated data](docs/demo.png)
@@ -32,6 +34,10 @@ email -> OTP (in memory) -> verified? -> breach lookup -> rule-based score -> LL
 | Per-IP and per-email limits, daily caps on emails and LLM calls | Prevents abuse and surprise bills on a public demo |
 | Phone guidance without phone lookup | SMS verification is costly and abuse-prone (SMS pumping); breach APIs are email-centric |
 | Simulated mode clearly labelled | Runs with no paid key; the UI shows a banner and the API returns `data_source: "simulated"` |
+
+## Demo page
+
+`docs/index.html` is a static page showing the result for three made-up people. `scripts/build_demo.py` generates it from the app's own scoring code and simulated breach records, so the page matches the engine; `tests/test_demo.py` fails if the page is out of date. After changing the scoring rules, run `python scripts/build_demo.py` and commit the new page.
 
 ## Run locally
 
